@@ -56,3 +56,48 @@ docker [-m][-a] commit 容器名称 | 容器Id
 docker run [--name] 容器别名 [-p 80:80]  镜像名称
 ```
 
+# 数据管理
+1. 数据卷: `容器内数据直接映射到本地主机环境`
+	- 在容器内创建数据卷
+			
+		``` sh
+		# 使用 -v 在容器内创建数据卷，使用-v 标记可以创建多个
+		docker run -d -P --name web -v /webapp training/webapp python app.py
+		# 使用 inspect 查看容器信息
+		docker inspect web
+		# "Volumes": {
+		#                "/webapp": {}
+		#            },
+		```
+	- 挂载一主机目录作为数据卷
+		``` sh
+		# 挂载一个本地 /src/webapp 目录到容器中的 /opt/webapp 作为数据卷
+		docker run -d -P --name wen1 -v /src/webapp:/opt/webapp training/webapp python app.py
+		# 挂载的数据卷默认权限是读写的，可以通过ro指定为只读
+				docker run -d -P --name wen1 -v /src/webapp:/opt/webapp:ro training/webapp python app.py		```
+
+2. 数据卷容器: `使用特定的容器维护数据卷`
+	
+	```sh
+	# 1.创建一个数据卷容器dbdata, 并在其中创建一个数据卷/dbdata
+	docker run -it -v /data --name dbdata ubuntu
+	# ls 查看目录，发现有一个 /dbdata目录
+	# 2. 创建两个容器，使用 --volumes-from 来挂载dbdata中的数据卷
+	docker run -it --volumes-from dbdata --name db1 ubuntu
+	docker run -it --volumes-from dbdata --name db2 ubuntu
+	# 此时，3个容器任何一方在改目录下的读写，其他容器都可以看到 
+	# 还可以从其他已经挂载了容器卷的容器来挂载数据卷
+	docker run -d --name db3 --volumes-from db1 training/postfres
+	```
+3. 利用数据卷容器来迁移数据
+	
+	``` sh
+	#备份
+	docker run --volumes-from dbdata -v $PWD:/backup --name worker ubuntu tar cvf /backup/backup.tar /dbdata
+	
+	# 回复
+	# 1.创建一个带数据卷的容器dbdata2
+	docker run  -it -v /dbdata --name dbdata2 ubuntu /bin/bash
+	# 2.创建一个新的容器，挂载dbdata2的容器，并使用tar 命令解压备份文件到挂载容器中
+	```
+
